@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.2](https://github.com/manujkathuria/showcase/releases/tag/v0.1.2) — 2026-10-09
+
+### Added
+
+- Stream-scoped replay index on `(stream_id, received_at, id)`.
+- Parameterized replay query-plan experiments and opt-in Go batched-write benchmarks.
+- Database performance report and independent review with captured query plans.
+- Task specification for a one-recording, one-client, read-only Zerodha-compatible replay server.
+
+### Verification status
+
+Market correctness checks passed and replay queries used the new index. Corrected comparative measurements and benchmark failure-cleanup review remain pending; see [Task 004 verification](docs/verification/004-database-performance.md). The mock WebSocket server is specified but not implemented.
+
 ## [0.1.1](https://github.com/manujkathuria/showcase/releases/tag/v0.1.1) — 2026-10-09
 
 ### Added

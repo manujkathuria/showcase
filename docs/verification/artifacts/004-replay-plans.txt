@@ -1,0 +1,194 @@
+              stream_id               | ticks  | min | max 
+--------------------------------------+--------+-----+-----
+ c0000000-0000-0000-0000-000000000003 | 100000 |  83 |  92
+ c0000000-0000-0000-0000-000000000004 | 100000 |  83 |  92
+(2 rows)
+
+                                                indexdef                                                 
+---------------------------------------------------------------------------------------------------------
+ CREATE INDEX live_ticks_stream_replay_idx ON market.live_ticks USING btree (stream_id, received_at, id)
+(1 row)
+
+BEGIN
+DO
+DO
+DO
+DO
+ROLLBACK
+DO
+                                                                              QUERY PLAN                                                                               
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..1.46 rows=1 width=188) (actual time=0.027..0.027 rows=1 loops=1)
+   Buffers: shared hit=9
+   ->  Nested Loop  (cost=0.42..20812.87 rows=20080 width=188) (actual time=0.026..0.027 rows=1 loops=1)
+         Buffers: shared hit=9
+         ->  Index Scan using live_ticks_instrument_received_idx on live_ticks t  (cost=0.42..20560.71 rows=20080 width=168) (actual time=0.016..0.016 rows=1 loops=1)
+               Index Cond: (instrument_id = 83)
+               Buffers: shared hit=8
+         ->  Materialize  (cost=0.00..1.17 rows=1 width=28) (actual time=0.009..0.009 rows=1 loops=1)
+               Buffers: shared hit=1
+               ->  Seq Scan on instruments inst  (cost=0.00..1.16 rows=1 width=28) (actual time=0.007..0.007 rows=1 loops=1)
+                     Filter: (id = 83)
+                     Rows Removed by Filter: 3
+                     Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=71
+ Planning Time: 0.306 ms
+ Execution Time: 0.043 ms
+(17 rows)
+
+                                                                                              QUERY PLAN                                                                                               
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.42..253.54 rows=100 width=84) (actual time=0.015..0.100 rows=100 loops=1)
+   Buffers: shared hit=106
+   ->  Nested Loop  (cost=0.42..15324.40 rows=6054 width=84) (actual time=0.015..0.093 rows=100 loops=1)
+         Buffers: shared hit=106
+         ->  Index Scan Backward using live_ticks_instrument_received_idx on live_ticks t  (cost=0.42..15247.56 rows=6054 width=64) (actual time=0.009..0.055 rows=100 loops=1)
+               Index Cond: ((instrument_id = 83) AND (received_at >= '2026-10-09 09:15:00+05:30'::timestamp with time zone) AND (received_at < '2026-10-09 09:20:00+05:30'::timestamp with time zone))
+               Buffers: shared hit=105
+         ->  Materialize  (cost=0.00..1.17 rows=1 width=28) (actual time=0.000..0.000 rows=1 loops=100)
+               Buffers: shared hit=1
+               ->  Seq Scan on instruments inst  (cost=0.00..1.16 rows=1 width=28) (actual time=0.004..0.005 rows=1 loops=1)
+                     Filter: (id = 83)
+                     Rows Removed by Filter: 12
+                     Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=13
+ Planning Time: 0.187 ms
+ Execution Time: 0.113 ms
+(17 rows)
+
+                                                                                                                                                                     QUERY PLAN                                                                                                                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=3.40..2458.59 rows=1005 width=218) (actual time=0.092..1.390 rows=1000 loops=1)
+   Sort Key: t.received_at, t.id, od.side, od.level
+   Presorted Key: t.received_at, t.id
+   Full-sort Groups: 25  Sort Method: quicksort  Average Memory: 34kB  Peak Memory: 34kB
+   Buffers: shared hit=429
+   ->  Nested Loop  (cost=0.99..2413.37 rows=1005 width=218) (actual time=0.029..0.638 rows=1000 loops=1)
+         Buffers: shared hit=429
+         ->  Limit  (cost=0.56..18.87 rows=100 width=188) (actual time=0.023..0.137 rows=100 loops=1)
+               Buffers: shared hit=27
+               ->  Nested Loop  (cost=0.56..18380.97 rows=100437 width=188) (actual time=0.023..0.129 rows=100 loops=1)
+                     Buffers: shared hit=27
+                     ->  Index Scan using live_ticks_stream_replay_idx on live_ticks t  (cost=0.42..15967.72 rows=100437 width=168) (actual time=0.013..0.034 rows=100 loops=1)
+                           Index Cond: ((stream_id = 'c0000000-0000-0000-0000-000000000003'::uuid) AND (received_at >= '2026-10-09 09:15:00+05:30'::timestamp with time zone) AND (ROW(received_at, id) > ROW('2026-10-09 09:15:00+05:30'::timestamp with time zone, 0)) AND (received_at < '2026-10-09 09:31:40+05:30'::timestamp with time zone))
+                           Buffers: shared hit=7
+                     ->  Memoize  (cost=0.15..0.16 rows=1 width=28) (actual time=0.000..0.000 rows=1 loops=100)
+                           Cache Key: t.instrument_id
+                           Cache Mode: logical
+                           Hits: 90  Misses: 10  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                           Buffers: shared hit=20
+                           ->  Index Scan using instruments_pkey on instruments inst  (cost=0.14..0.15 rows=1 width=28) (actual time=0.001..0.001 rows=1 loops=10)
+                                 Index Cond: (id = t.instrument_id)
+                                 Buffers: shared hit=20
+         ->  Index Scan using order_depth_pk on order_depth od  (cost=0.43..23.84 rows=10 width=38) (actual time=0.002..0.003 rows=10 loops=100)
+               Index Cond: (tick_id = t.id)
+               Buffers: shared hit=402
+ Planning:
+   Buffers: shared hit=50 dirtied=1
+ Planning Time: 0.384 ms
+ Execution Time: 1.455 ms
+(29 rows)
+
+                                                                                                                                                                       QUERY PLAN                                                                                                                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=3.03..20870.77 rows=10047 width=218) (actual time=0.098..11.085 rows=10000 loops=1)
+   Sort Key: t.received_at, t.id, od.side, od.level
+   Presorted Key: t.received_at, t.id
+   Full-sort Groups: 250  Sort Method: quicksort  Average Memory: 34kB  Peak Memory: 34kB
+   Buffers: shared hit=4054
+   ->  Nested Loop  (cost=0.99..20418.65 rows=10047 width=218) (actual time=0.045..4.757 rows=10000 loops=1)
+         Buffers: shared hit=4054
+         ->  Limit  (cost=0.56..262.90 rows=1000 width=188) (actual time=0.025..0.717 rows=1000 loops=1)
+               Buffers: shared hit=54
+               ->  Nested Loop  (cost=0.56..13631.63 rows=51960 width=188) (actual time=0.024..0.653 rows=1000 loops=1)
+                     Buffers: shared hit=54
+                     ->  Index Scan using live_ticks_stream_replay_idx on live_ticks t  (cost=0.42..12382.36 rows=51960 width=168) (actual time=0.020..0.195 rows=1000 loops=1)
+                           Index Cond: ((stream_id = 'c0000000-0000-0000-0000-000000000003'::uuid) AND (received_at >= '2026-10-09 09:15:00+05:30'::timestamp with time zone) AND (ROW(received_at, id) > ROW('2026-10-09 09:23:00+05:30'::timestamp with time zone, 150000)) AND (received_at < '2026-10-09 09:31:40+05:30'::timestamp with time zone))
+                           Buffers: shared hit=34
+                     ->  Memoize  (cost=0.15..0.16 rows=1 width=28) (actual time=0.000..0.000 rows=1 loops=1000)
+                           Cache Key: t.instrument_id
+                           Cache Mode: logical
+                           Hits: 990  Misses: 10  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                           Buffers: shared hit=20
+                           ->  Index Scan using instruments_pkey on instruments inst  (cost=0.14..0.15 rows=1 width=28) (actual time=0.001..0.001 rows=1 loops=10)
+                                 Index Cond: (id = t.instrument_id)
+                                 Buffers: shared hit=20
+         ->  Index Scan using order_depth_pk on order_depth od  (cost=0.43..20.06 rows=10 width=38) (actual time=0.001..0.002 rows=10 loops=1000)
+               Index Cond: (tick_id = t.id)
+               Buffers: shared hit=4000
+ Planning:
+   Buffers: shared hit=34
+ Planning Time: 0.349 ms
+ Execution Time: 11.462 ms
+(29 rows)
+
+                                                                                                                                                                       QUERY PLAN                                                                                                                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=3.11..21584.97 rows=10047 width=218) (actual time=0.106..11.086 rows=10000 loops=1)
+   Sort Key: t.received_at, t.id, od.side, od.level
+   Presorted Key: t.received_at, t.id
+   Full-sort Groups: 250  Sort Method: quicksort  Average Memory: 34kB  Peak Memory: 34kB
+   Buffers: shared hit=4054
+   ->  Nested Loop  (cost=0.99..21132.86 rows=10047 width=218) (actual time=0.049..4.752 rows=10000 loops=1)
+         Buffers: shared hit=4054
+         ->  Limit  (cost=0.56..977.11 rows=1000 width=188) (actual time=0.028..0.709 rows=1000 loops=1)
+               Buffers: shared hit=54
+               ->  Nested Loop  (cost=0.56..9470.10 rows=9697 width=188) (actual time=0.028..0.645 rows=1000 loops=1)
+                     Buffers: shared hit=54
+                     ->  Index Scan using live_ticks_stream_replay_idx on live_ticks t  (cost=0.42..9235.59 rows=9697 width=168) (actual time=0.023..0.194 rows=1000 loops=1)
+                           Index Cond: ((stream_id = 'c0000000-0000-0000-0000-000000000003'::uuid) AND (received_at >= '2026-10-09 09:15:00+05:30'::timestamp with time zone) AND (ROW(received_at, id) > ROW('2026-10-09 09:30:00+05:30'::timestamp with time zone, 190000)) AND (received_at < '2026-10-09 09:31:40+05:30'::timestamp with time zone))
+                           Buffers: shared hit=34
+                     ->  Memoize  (cost=0.15..0.16 rows=1 width=28) (actual time=0.000..0.000 rows=1 loops=1000)
+                           Cache Key: t.instrument_id
+                           Cache Mode: logical
+                           Hits: 990  Misses: 10  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                           Buffers: shared hit=20
+                           ->  Index Scan using instruments_pkey on instruments inst  (cost=0.14..0.15 rows=1 width=28) (actual time=0.001..0.001 rows=1 loops=10)
+                                 Index Cond: (id = t.instrument_id)
+                                 Buffers: shared hit=20
+         ->  Index Scan using order_depth_pk on order_depth od  (cost=0.43..20.06 rows=10 width=38) (actual time=0.001..0.002 rows=10 loops=1000)
+               Index Cond: (tick_id = t.id)
+               Buffers: shared hit=4000
+ Planning:
+   Buffers: shared hit=34
+ Planning Time: 0.374 ms
+ Execution Time: 11.450 ms
+(29 rows)
+
+                                                                                                                                                                     QUERY PLAN                                                                                                                                                                     
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Incremental Sort  (cost=3.47..2523.94 rows=1005 width=218) (actual time=0.081..1.301 rows=1000 loops=1)
+   Sort Key: t.received_at, t.id, od.side, od.level
+   Presorted Key: t.received_at, t.id
+   Full-sort Groups: 25  Sort Method: quicksort  Average Memory: 34kB  Peak Memory: 34kB
+   Buffers: shared hit=423
+   ->  Nested Loop  (cost=0.99..2478.72 rows=1005 width=218) (actual time=0.024..0.656 rows=1000 loops=1)
+         Buffers: shared hit=423
+         ->  Limit  (cost=0.56..84.22 rows=100 width=188) (actual time=0.015..0.161 rows=100 loops=1)
+               Buffers: shared hit=23
+               ->  Nested Loop  (cost=0.56..16699.81 rows=19963 width=188) (actual time=0.014..0.154 rows=100 loops=1)
+                     Buffers: shared hit=23
+                     ->  Index Scan using live_ticks_stream_replay_idx on live_ticks t  (cost=0.42..16218.81 rows=19963 width=168) (actual time=0.009..0.101 rows=100 loops=1)
+                           Index Cond: ((stream_id = 'c0000000-0000-0000-0000-000000000003'::uuid) AND (received_at >= '2026-10-09 09:15:00+05:30'::timestamp with time zone) AND (ROW(received_at, id) > ROW('2026-10-09 09:15:00+05:30'::timestamp with time zone, 0)) AND (received_at < '2026-10-09 09:31:40+05:30'::timestamp with time zone))
+                           Filter: (instrument_id = ANY ('{83,84}'::bigint[]))
+                           Rows Removed by Filter: 392
+                           Buffers: shared hit=19
+                     ->  Memoize  (cost=0.15..0.16 rows=1 width=28) (actual time=0.000..0.000 rows=1 loops=100)
+                           Cache Key: t.instrument_id
+                           Cache Mode: logical
+                           Hits: 98  Misses: 2  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                           Buffers: shared hit=4
+                           ->  Index Scan using instruments_pkey on instruments inst  (cost=0.14..0.15 rows=1 width=28) (actual time=0.001..0.001 rows=1 loops=2)
+                                 Index Cond: (id = t.instrument_id)
+                                 Buffers: shared hit=4
+         ->  Index Scan using order_depth_pk on order_depth od  (cost=0.43..23.84 rows=10 width=38) (actual time=0.002..0.003 rows=10 loops=100)
+               Index Cond: (tick_id = t.id)
+               Buffers: shared hit=400
+ Planning:
+   Buffers: shared hit=39
+ Planning Time: 0.362 ms
+ Execution Time: 1.361 ms
+(31 rows)
+

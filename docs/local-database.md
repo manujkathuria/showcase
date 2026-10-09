@@ -42,6 +42,9 @@ psql -v ON_ERROR_STOP=1 -d intraday_streaming -f infra/db/migrations/001_feed_co
 
 # Migration 002: Market tick and depth storage
 psql -v ON_ERROR_STOP=1 -d intraday_streaming -f infra/db/migrations/002_market_tick_storage.sql
+
+# Migration 003: Stream-scoped keyset replay index
+psql -v ON_ERROR_STOP=1 -d intraday_streaming -f infra/db/migrations/003_stream_replay_index.sql
 ```
 
 ### Rerun behavior
@@ -172,6 +175,23 @@ This verification:
 - Confirms `streaming_app` has `USAGE` on schema `market` and `SELECT` on `market.live_ticks` and `market.order_depth`.
 - Confirms `streaming_app` is blocked from `INSERT`, `UPDATE`, or `DELETE` on market tables.
 - Confirms `streaming_app` is blocked from creating tables in `market` or `public`.
+
+### 6. Mock replay performance benchmarks and query plans
+
+Run with an authorized administrator connection:
+
+```bash
+# Default parameters:
+psql -v ON_ERROR_STOP=1 -d intraday_streaming -f infra/db/checks/006_replay_benchmarks.sql
+
+# Custom parameters:
+psql -v ON_ERROR_STOP=1 -d intraday_streaming \
+  -v stream_id="'c0000000-0000-0000-0000-000000000003'" \
+  -v page_limit=1000 \
+  -f infra/db/checks/006_replay_benchmarks.sql
+```
+
+Measures `EXPLAIN (ANALYZE, BUFFERS)` plans across first/middle/late keyset pages, narrow subscription subsets, and complete 10-level order depth joins.
 
 ## Feed startup read query
 
